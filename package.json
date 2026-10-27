@@ -1,0 +1,24 @@
+{
+  "name": "teamflow",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "doc": "docs"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/habtamugeta2-r/TeamFlow.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/habtamugeta2-r/TeamFlow/issues"
+  },
+  "homepage": "https://github.com/habtamugeta2-r/TeamFlow#readme"
+}
