@@ -1,24 +1,30 @@
 {
   "name": "teamflow",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
-  "directories": {
-    "doc": "docs"
+  "private": true,
+  "description": "A full-stack team project management application",
+  "engines": {
+    "node": ">=22.13.0"
   },
+  "workspaces": [
+    "apps/web",
+    "apps/api"
+  ],
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "dev": "concurrently --kill-others --names api,web \"npm:dev:api\" \"npm:dev:web\"",
+    "dev:api": "npm run dev --workspace=@teamflow/api",
+    "dev:web": "npm run dev --workspace=@teamflow/web",
+    "build": "npm run build --workspaces --if-present",
+    "start:api": "npm run start --workspace=@teamflow/api",
+    "start:web": "npm run start --workspace=@teamflow/web",
+    "lint": "npm run lint --workspaces --if-present",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
   },
-  "repository": {
-    "type": "git",
-    "url": "git+https://github.com/habtamugeta2-r/TeamFlow.git"
-  },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "type": "commonjs",
-  "bugs": {
-    "url": "https://github.com/habtamugeta2-r/TeamFlow/issues"
-  },
-  "homepage": "https://github.com/habtamugeta2-r/TeamFlow#readme"
+  "devDependencies": {
+    "concurrently": "^10.0.6",
+    "prettier": "^3.9.10"
+  }
 }
