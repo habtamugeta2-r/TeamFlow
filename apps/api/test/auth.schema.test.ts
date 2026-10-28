@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { registerSchema } from "../src/modules/auth/auth.schema.js";
+import { registerSchema, loginSchema } from "../src/modules/auth/auth.schema.js";
 
 describe("registerSchema", () => {
   it("normalizes the name and email", () => {
@@ -26,6 +26,20 @@ describe("registerSchema", () => {
     expect(result.success).toBe(false);
     if (!result.success) {
       expect(result.error.issues).toHaveLength(3);
+    }
+  });
+});
+
+describe("loginSchema", () => {
+  it("rejects short passwords and invalid emails", () => {
+    const result = loginSchema.safeParse({
+      email: "not-an-email",
+      password: "short",
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.issues).toHaveLength(2);
     }
   });
 });
