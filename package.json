@@ -15,13 +15,15 @@
     "dev:api": "npm run dev --workspace=@teamflow/api",
     "dev:web": "npm run dev --workspace=@teamflow/web",
     "build": "npm run build --workspaces --if-present",
+    "db:generate": "npm run db:generate --workspace=@teamflow/api",
     "start:api": "npm run start --workspace=@teamflow/api",
     "start:web": "npm run start --workspace=@teamflow/web",
     "lint": "npm run lint --workspaces --if-present",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "typecheck": "npm run typecheck --workspaces --if-present",
-    "test": "npm run test --workspaces --if-present"
+    "test": "npm run test --workspaces --if-present",
+    "postinstall": "npm run db:generate"
   },
   "devDependencies": {
     "concurrently": "^10.0.6",
