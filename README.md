@@ -1,58 +1,75 @@
 # TeamFlow
 
-TeamFlow is a project-management workspace for small teams. It brings workspaces,
-projects, tasks, and an auditable activity history together behind a permission-
-checked API.
+TeamFlow is a project-management app for small teams. It brings team
+workspaces, projects, tasks, and an activity history together in one place.
 
-## Project status
+The project is under active development. This README describes the product
+scope and how to work with the code; the
+[implementation checklist](./docs/implementation-checklist.md) tracks delivery
+and remaining work.
 
-**Phase 0 — Project definition and engineering decisions: complete.**
-**Phase 1 — Repository and development environment: complete.**
-The implementation checklist in [docs/implementation-checklist.md](./docs/implementation-checklist.md)
-tracks verified deliverables and remaining work across the implementation
-phases.
+## MVP scope
 
-## MVP
+The first release focuses on the core team workflow:
 
-The first release is intended to let a team:
+- **Accounts:** Register, sign in, and sign out.
+- **Workspaces:** Create and manage team workspaces.
+- **Membership and permissions:** Add registered users, manage member roles,
+  and transfer workspace ownership.
+- **Projects:** Create, update, browse, and archive workspace projects.
+- **Tasks:** Create and update tasks, set priority and due dates, assign
+  workspace members, and filter and paginate task lists.
+- **Activity history:** Review project and task changes made in a workspace.
 
-1. Register, log in, and log out.
-2. Create and access a workspace.
-3. Manage workspace membership and roles.
-4. Create, view, update, and archive projects.
-5. Create, assign, filter, and update tasks.
-6. Review important project and task activity.
+### Roles
+
+- **Owner:** Full workspace administration, including ownership transfer.
+- **Admin:** Manage workspace members and project details.
+- **Member:** Work with workspace projects and tasks.
+
+Every project belongs to a workspace. Workspace members can access its
+projects, tasks, and activity; the API enforces these permissions on every
+request. See [workspace permissions](./docs/permissions.md) for the full rules.
+
+### Not included in the MVP
 
 Real-time collaboration, recurring tasks, file attachments, advanced analytics,
-billing, and mobile applications are out of scope for the first release.
+billing, and native mobile apps are outside the initial scope.
 
-## Architecture
+## Technology and architecture
 
-- **Web:** Next.js App Router, responsible for the user interface.
-- **API:** Express 5 REST API, responsible for validation, authentication,
-  authorization, and business rules.
-- **Database:** PostgreSQL, accessed and migrated with Prisma.
-- **Validation:** Zod at the API boundary.
-- **Testing:** Vitest and Supertest, with tests added alongside API features.
-- **Repository:** npm workspaces, with separate `apps/web` and `apps/api`
-  applications.
+- **Web:** Next.js App Router and React.
+- **API:** Express 5 REST API with TypeScript and Zod validation.
+- **Data:** PostgreSQL and Prisma migrations.
+- **Tests:** Vitest and Supertest for the API.
+- **Workspace tooling:** npm workspaces.
 
-The browser uses a same-origin `/api` path that is forwarded to Express.
-Express—not the frontend—remains the authority for access checks. See
-[docs/architecture.md](./docs/architecture.md) and
-[docs/permissions.md](./docs/permissions.md) for the decisions and constraints.
+The browser sends same-origin `/api` requests through the Next.js proxy to the
+Express API. The API owns validation, authentication, authorization, and
+business rules; frontend visibility is not an access-control boundary.
 
-## Development
+```text
+apps/
+  web/                 Next.js routes, features, and shared UI
+  api/                 Express API and feature modules
+    prisma/            Database schema and versioned migrations
+docs/                  Architecture, permissions, and delivery checklist
+```
 
-### Prerequisites
+For request flow, module boundaries, and engineering conventions, see
+[Architecture](./docs/architecture.md).
 
-- Node.js 22.13 or newer (Node.js 24.22.1 and npm 11.19.1 were used to verify
-  the current setup).
-- npm 10 or newer.
+## Getting started
 
-### First-time setup
+### Requirements
 
-Run these commands from the repository root:
+- Node.js 22.13 or newer
+- npm 10 or newer
+- PostgreSQL for database-backed API features
+
+### Install and configure
+
+From the repository root:
 
 ```bash
 npm ci
@@ -60,34 +77,40 @@ cp .env.example apps/api/.env
 cp .env.example apps/web/.env.local
 ```
 
-The API reads its configuration from `apps/api/.env`; Next.js reads
-`apps/web/.env.local`. Both environment files are ignored by Git. Adjust
-`DATABASE_URL`, `API_HOST`, or `API_PORT` for the API, and `API_URL` for the web
-proxy, if your local setup uses different values. Each app ignores the other
-app's settings from the shared example. The example database URL is for a
-local PostgreSQL instance; change it if your database uses different
-credentials, host, port, or database name.
+Set `DATABASE_URL` in `apps/api/.env` to your PostgreSQL database. The API
+loads its environment from that file. The web app loads
+`apps/web/.env.local`; set `API_URL` there if the API is not running at
+`http://127.0.0.1:4000`. Both files are ignored by Git.
 
-### Run the applications
+Database schema changes are versioned in `apps/api/prisma/migrations/`.
+Database-backed features require a PostgreSQL database with the project
+migrations applied.
+
+### Run the app
 
 ```bash
 npm run dev
 ```
 
-This starts the Express API at `http://127.0.0.1:4000` and the Next.js app at
-`http://localhost:3000`. Open the web app in a browser. The API health check is
-available directly at `http://127.0.0.1:4000/api/health` and through the
-same-origin web proxy at `http://localhost:3000/api/health`. Both return:
+This starts the API at `http://127.0.0.1:4000` and the web app at
+`http://localhost:3000`. Open the web app to use TeamFlow. The API health
+endpoint is available at `http://127.0.0.1:4000/api/health` and through the
+web proxy at `http://localhost:3000/api/health`.
 
-```json
-{ "status": "ok" }
+To start one app at a time:
+
+```bash
+npm run dev:api
+npm run dev:web
 ```
 
-The apps can also be started independently with `npm run dev:api` and
-`npm run dev:web`. The web app forwards `/api/*` requests to the `API_URL`
-origin; keep it pointed at the API service.
+The web app forwards `/api/*` requests to the `API_URL` origin. The API can
+serve its health check without a database connection, but authentication and
+workspace operations require a reachable, migrated PostgreSQL database.
 
-### Quality checks and production builds
+## Quality checks
+
+Run these commands from the repository root:
 
 ```bash
 npm run lint
@@ -97,13 +120,11 @@ npm test
 npm run build
 ```
 
-`npm run format` applies the configured Prettier formatting.
+Use `npm run format` to apply the configured Prettier formatting.
 
-The API can start and serve its liveness check without a running PostgreSQL
-instance, but authentication, workspace operations, and the database readiness
-check require a reachable database at `DATABASE_URL`.
+## Project documentation
 
-## Roadmap
-
-Work is divided into small phases with acceptance criteria. Track progress in
-[docs/implementation-checklist.md](./docs/implementation-checklist.md).
+- [Architecture and engineering conventions](./docs/architecture.md)
+- [Workspace permissions](./docs/permissions.md)
+- [Implementation checklist and project progress](./docs/implementation-checklist.md)
+- [Web application structure](./apps/web/README.md)
