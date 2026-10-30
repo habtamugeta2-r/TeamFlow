@@ -1,5 +1,8 @@
 import { describe, expect, it } from "vitest";
-import { registerSchema, loginSchema } from "../src/modules/auth/auth.schema.js";
+import {
+  registerSchema,
+  loginSchema,
+} from "../src/modules/auth/auth.schemas.js";
 
 describe("registerSchema", () => {
   it("normalizes the name and email", () => {

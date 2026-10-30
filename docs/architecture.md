@@ -1,183 +1,172 @@
-# TeamFlow architecture
+# Architecture
 
-## Goals and boundaries
+## System boundaries
 
-TeamFlow is a TypeScript monorepo with three clear responsibilities:
+| Component  | Responsibility                                                              |
+| ---------- | --------------------------------------------------------------------------- |
+| `apps/web` | Next.js interface and same-origin `/api` forwarding                         |
+| `apps/api` | Express REST API, validation, authentication, authorization, business rules |
+| PostgreSQL | Persistent data and relational integrity, accessed through Prisma           |
 
-- **Next.js (`apps/web`)** renders the application and collects user input.
-- **Express (`apps/api`)** owns the REST API, sessions, validation,
-  authorization, and business rules.
-- **PostgreSQL** persists application data and enforces relational integrity.
+Express is the authority for business rules and access control. The web app may
+hide unavailable actions for usability, but never replaces API authorization.
 
-The frontend may hide actions a user cannot take, but this is only a usability
-feature. Every protected API operation must independently authenticate the
-request and authorize it against the relevant workspace and resource.
-
-## Request and data flow
+## Request flow
 
 ```text
-Browser
-  |
-  | same-origin pages and /api requests
-  v
-Next.js web app / same-origin API forwarding
-  |
-  | HTTP; forwards request and response, including session cookies
-  v
-Express REST API
-  |
-  | Prisma queries and migrations
-  v
-PostgreSQL
+Browser → Next.js (/api proxy) → Express → Prisma → PostgreSQL
 ```
 
-In development, Next.js forwards `/api/*` to the local Express service using a
-rewrite configured by `API_URL`. In production, the hosting or reverse-proxy
-configuration provides the same same-origin route. The forwarding layer must
-preserve HTTP methods, request bodies, status codes, and relevant headers,
-including `Set-Cookie`.
+In development, `API_URL` configures the Next.js rewrite. Production hosting
+must provide the same-origin proxy and preserve methods, bodies, status codes,
+and headers such as `Set-Cookie`. The proxy handles transport only; it does not
+implement business logic or authorization.
 
-The forwarding layer is transport only. It must not duplicate business logic,
-make authorization decisions, or become a second source of application data.
-The browser uses relative `/api` URLs. Express is the single API and
-authorization authority.
-
-## Initial repository structure
+## Code organization
 
 ```text
-teamflow/
-├── apps/
-│   ├── web/                 # Next.js App Router application
-│   └── api/                 # Express 5 REST API
-├── docs/
-│   ├── architecture.md
-│   ├── implementation-checklist.md
-│   └── permissions.md
-├── .github/
-│   └── workflows/           # CI workflows, added during implementation
-├── package.json             # npm workspaces and root scripts
-├── package-lock.json
-└── README.md
+apps/
+  web/                 Next.js App Router application
+  api/
+    src/
+      app.module.ts    Root Express router and feature registration
+      app.ts           Express app and global middleware
+      server.ts        HTTP server lifecycle
+      config/          Validated environment
+      core/            Shared logger
+      db/              Prisma client
+      http/            Validation, responses, errors, and Express middleware
+      modules/
+        auth/          Routes, controller, session middleware, schemas, service
+        activity/      Workspace-scoped append-only activity feed
+        health/        Routes, controller, service
+        projects/      Workspace-scoped project routes, schemas, and service
+        tasks/         Project-scoped task routes, schemas, and service
+        workspaces/    Routes, controller, schemas, service
+    prisma/            Schema and versioned migrations
+docs/                  Architecture, permissions, and delivery checklist
 ```
 
-Do not add a shared package until both applications demonstrably need the same
-schemas or types. The API's validation remains authoritative even if a future
-shared package is introduced.
+Keep related behavior in feature modules. Routers declare paths and middleware;
+controllers translate HTTP input and service outcomes into HTTP responses;
+services contain business rules and persistence without depending on Express.
+Each `*.module.ts` function wires its feature's dependencies, service,
+controller, and router. Route factories receive controllers rather than
+constructing them, so feature boundaries own composition. The auth factory
+provides its session guard to protected features. Health checks are registered
+as a feature router;
+readiness failures are logged and returned as an unavailable status without
+exposing details. Add layers only when they have a clear responsibility. Do
+not add a repository layer that merely wraps Prisma calls or a shared package
+until both apps demonstrably need the same code.
+
+`app.module.ts` creates feature routers, supplies shared dependencies, and
+mounts them under `/api`. `app.ts` configures the Express instance, global
+middleware, and error handling; `server.ts` only starts and shuts down the HTTP
+server. Logging is injected into request logging, rate-limiting, health checks,
+and the error handler rather than imported by those HTTP components. The
+request flow is
+`Express middleware → root router → feature router → controller → service → Prisma`.
+Feature code does not import the global database singleton.
+
+## Documentation style
+
+- [README](../README.md): setup and common commands.
+- [Architecture](./architecture.md): system boundaries and engineering rules.
+- [Permissions](./permissions.md): roles and access decisions.
+- [Implementation checklist](./implementation-checklist.md): delivery status.
+
+In code, explain non-obvious behavior and invariants; avoid comments that repeat
+what the code already says.
 
 ## API conventions
 
-- Use REST endpoints under `/api`; do not add versioning until a compatibility
-  need exists.
-- Validate request bodies, path parameters, and query parameters with Zod at
-  the API boundary.
-- Return appropriate HTTP status codes rather than success-shaped error
-  responses.
-- Use a consistent JSON error envelope:
+- Place REST endpoints under `/api`; validate bodies and route/query parameters
+  with Zod at the boundary.
+- Use authentication middleware for protected routes. Services report
+  domain-level outcomes; routes translate expected errors to HTTP exceptions.
+- Use Express 5 async handlers with the shared error middleware and response
+  helpers. Rejected handler promises flow to the final Express error handler.
+- Return successful payloads under `data`; return errors as
+  `{ "error": { "code": "...", "message": "...", "details": [] } }`.
+- Keep logs free of query strings. JSON bodies are limited to 100 KB, with a
+  consistent `413` response when exceeded.
+- Credential endpoints are rate limited per client IP and endpoint. The
+  defaults are 20 requests per 60 seconds; `AUTH_RATE_LIMIT_MAX=0` disables the
+  limiter. The in-memory limiter is process-local; use a shared gateway or
+  store if multiple API instances need a common limit. Configure `TRUST_PROXY`
+  only for the trusted reverse-proxy topology so client IPs are accurate
+  without trusting caller-supplied forwarding headers.
+- Responses include baseline security headers and a validated `X-Request-Id`
+  for log correlation. Production responses add HSTS when TLS terminates at the
+  deployment edge. The API drains HTTP connections and disconnects Prisma on
+  `SIGINT` and `SIGTERM`.
+- Do not return secrets, stack traces, or internal error details.
+- Apply filtering and pagination in the database, validate sort fields, and
+  bound page size.
+- Tasks are nested under
+  `/api/workspaces/:workspaceId/projects/:projectId/tasks`. Their project and
+  workspace are taken from the route and checked against the authenticated
+  user's membership. Assignees must be current members of that workspace.
+- Task status transitions are `TODO → IN_PROGRESS → DONE`; completed tasks
+  may be reopened to `TODO` or `IN_PROGRESS`. Direct `TODO → DONE` transitions
+  are rejected. Archived projects remain readable but reject task writes.
+- Task lists accept optional `status`, `priority`, and `assigneeId` filters;
+  use `assigneeId=unassigned` for unassigned tasks. Pagination defaults to
+  `page=1&limit=20` and caps `limit` at 100. Sorting is restricted to
+  `createdAt`, `updatedAt`, `dueDate`, `title`, `priority`, `status`, or `id`,
+  with `sortOrder=asc|desc`. List responses include `page`, `limit`, `total`,
+  and `totalPages` under `data.pagination`.
+- Workspace activity is read through
+  `/api/workspaces/:workspaceId/activity`; every request verifies current
+  workspace membership. Events are created only alongside the corresponding
+  project/task transaction. Actor name and email are snapshotted for historical
+  display in the workspace dashboard, while actor ID becomes nullable if that
+  user is later deleted. Workspace deletion removes its activity records.
+- Activity events cover project creation, metadata changes, and archive; task
+  creation, field changes, status transitions, assignment/unassignment,
+  priority changes, and completion. Read responses are ordered newest first
+  and include the event type, workspace/resource IDs, actor snapshot, details,
+  timestamp, and pagination metadata.
 
-  ```json
-  {
-    "error": {
-      "code": "VALIDATION_ERROR",
-      "message": "The request is invalid.",
-      "details": []
-    }
-  }
-  ```
+## Authentication and security
 
-- Do not expose stack traces, secrets, or internal implementation details in
-  production error responses.
-- Apply pagination and filters in the database, validate sort fields, and set
-  a maximum page size.
+The API uses opaque, database-backed sessions. The browser receives the
+high-entropy token in an `HttpOnly`, `SameSite=Lax` cookie; only its hash is
+stored. Passwords are hashed with Argon2. Sessions expire, rotate on login,
+and are revoked on logout. Login performs a dummy Argon2 verification for
+unknown email addresses so they do not fail noticeably faster than incorrect
+passwords for existing accounts.
 
-## Authentication and browser security
+Use `Secure` cookies in production and keep secrets in environment
+configuration. Protect state-changing requests against CSRF before enabling
+additional browser workflows. If web and API are deployed on separate origins,
+review CORS, credentials, cookie policy, and CSRF together.
 
-Use an opaque, high-entropy, database-backed session. The browser receives only
-the session token in a cookie; persist a hash of the token in the database.
-Authenticate API requests from this cookie, not from frontend state or
-client-controlled user IDs.
+## Data and migrations
 
-- Hash passwords with Argon2id and use a unique salt per password.
-- Set the session cookie `HttpOnly`, `SameSite=Lax`, and `Secure` in production.
-- Rotate the session on successful login and revoke it on logout.
-- Expire sessions and support server-side revocation.
-- Protect state-changing requests with CSRF defenses, including origin checks
-  and a CSRF token where needed.
-- Keep secrets in environment configuration; never commit them.
-
-The same-origin API route avoids a browser-facing cross-origin cookie setup. If
-hosting later requires separate frontend and API origins, explicitly review
-credentialed CORS, cookie policy, and CSRF protections before enabling it.
-
-## Persistence and migrations
-
-PostgreSQL is the source of truth. Prisma defines the schema and creates
-versioned, checked-in migrations. Local development uses migrations to evolve
-the schema; production applies reviewed migrations as a controlled deployment
-step. Do not use schema-push shortcuts as a substitute for production
+PostgreSQL is the source of truth. Prisma schema changes are captured in
+checked-in migrations; production applies reviewed migrations as a controlled
+deployment step. Do not use schema push as a substitute for production
 migrations.
 
-The initial conceptual entities are:
+**Implemented foundation:** users, sessions, workspaces, workspace
+memberships, workspace-scoped projects, project-scoped tasks, and transactional
+workspace activity.
+See the [implementation checklist](./implementation-checklist.md) for phase
+status and [permissions](./permissions.md) for workspace access rules.
 
-- **User** — registered account and password hash.
-- **Session** — hashed session token, user, and expiry.
-- **Workspace** — team boundary.
-- **Membership** — user-to-workspace relationship and workspace role.
-- **Project** — workspace-owned work area with active or archived lifecycle.
-- **Task** — project-owned item, optional member assignee, status, priority, and
-  optional due date.
-- **Activity** — append-only record of important changes, actor, workspace,
-  resource, and event data.
+## Verification
 
-Exact columns, indexes, constraints, and deletion behavior will be finalized in
-Phase 2 before the initial migration. Membership is a separate entity because
-a user's role is specific to each workspace.
+Use Vitest and Supertest for API behavior, especially validation and access
+boundaries. Database-backed integration tests should use a dedicated test
+database. Add frontend and end-to-end coverage as user flows are implemented.
+CI should run lint, formatting, type checks, tests, and production builds.
 
-## Initial workflows
+## Deferred decisions
 
-### Project lifecycle
-
-Projects are created active. A workspace owner or admin can update project
-metadata and archive a project. Archived projects remain readable for history
-but do not accept ordinary task changes. Project deletion is not part of the
-initial MVP.
-
-### Task lifecycle
-
-The initial states are `TODO`, `IN_PROGRESS`, and `DONE`. Normal progression is
-`TODO → IN_PROGRESS → DONE`. Reopening is allowed: `DONE → IN_PROGRESS`, and
-work may return from `IN_PROGRESS → TODO`. A direct `TODO → DONE` transition is
-not allowed. The API validates every transition.
-
-Task priority starts with `LOW`, `MEDIUM`, and `HIGH`. Tasks may be unassigned;
-an assignee, when present, must be a current member of the task's workspace.
-
-### Activity
-
-Record project creation, update, and archive, and task creation, status change,
-assignment change, priority change, and completion. Store the actor and
-workspace with each event. Persist a business change and its activity record in
-the same database transaction when both must succeed together. Activity is
-append-only in the application and readable only by workspace members.
-
-## Testing and quality
-
-Use Vitest for unit and integration test execution and Supertest for HTTP API
-tests. Test the API's validation and permission boundaries, including attempts
-to access another workspace's resources. Keep a dedicated test database for
-database integration tests. Add frontend and end-to-end coverage as the
-corresponding user flows are implemented.
-
-GitHub Actions will eventually run linting, type-checking, tests, and
-production builds. CI is introduced early in implementation and expanded as
-applications and database tests are added.
-
-## Deliberately deferred decisions
-
-- Production hosting and AWS service selection are deferred until Phase 13 so
-  cost and operational complexity can be evaluated against the completed
-  application.
-- Email delivery and self-service invitation links are not required for the
-  initial membership flow. Initially, an owner or admin can add an already
-  registered user by exact account email.
-- Project-level roles, fine-grained task permissions, and workspace deletion
-  are outside the initial MVP.
+- Select hosting and cloud services during the deployment phase.
+- Keep project-level roles, fine-grained task permissions, and separate API
+  origins out of scope until there is a concrete need.
+- Membership invitations initially target existing registered users; email
+  delivery and self-service links are deferred.

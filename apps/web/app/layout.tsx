@@ -1,9 +1,11 @@
 import type { Metadata } from "next";
+import "@fontsource-variable/manrope";
+import "@fontsource-variable/newsreader";
 import "./globals.css";
 
 export const metadata: Metadata = {
   title: "TeamFlow",
-  description: "A clear workspace for teams to organize projects and tasks.",
+  description: "A clear home for your team, workspaces, and shared work.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

@@ -9,7 +9,8 @@ checked API.
 **Phase 0 — Project definition and engineering decisions: complete.**
 **Phase 1 — Repository and development environment: complete.**
 The implementation checklist in [docs/implementation-checklist.md](./docs/implementation-checklist.md)
-tracks the remaining phases. The next milestone is Phase 2: database design.
+tracks verified deliverables and remaining work across the implementation
+phases.
 
 ## MVP
 
@@ -61,9 +62,11 @@ cp .env.example apps/web/.env.local
 
 The API reads its configuration from `apps/api/.env`; Next.js reads
 `apps/web/.env.local`. Both environment files are ignored by Git. Adjust
-`API_HOST` or `API_PORT` for the API, and `API_URL` for the web proxy, if your
-local setup uses different values. Each app ignores the other app's settings
-from the shared example.
+`DATABASE_URL`, `API_HOST`, or `API_PORT` for the API, and `API_URL` for the web
+proxy, if your local setup uses different values. Each app ignores the other
+app's settings from the shared example. The example database URL is for a
+local PostgreSQL instance; change it if your database uses different
+credentials, host, port, or database name.
 
 ### Run the applications
 
@@ -94,8 +97,11 @@ npm test
 npm run build
 ```
 
-`npm run format` applies the configured Prettier formatting. A PostgreSQL
-instance is not needed for this phase; database setup begins in Phase 2.
+`npm run format` applies the configured Prettier formatting.
+
+The API can start and serve its liveness check without a running PostgreSQL
+instance, but authentication, workspace operations, and the database readiness
+check require a reachable database at `DATABASE_URL`.
 
 ## Roadmap
 
