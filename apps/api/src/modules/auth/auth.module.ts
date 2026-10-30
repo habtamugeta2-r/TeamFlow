@@ -22,13 +22,14 @@ export function createAuthModule(deps: AuthModuleDependencies) {
   const controller = new AuthController(service);
   const guard = createAuthGuard(service);
   return {
-    router: createAuthRouter(
-      controller,
-      guard,
-      deps.credentialRateLimiter,
-    ),
+    router: createAuthRouter(controller, guard, deps.credentialRateLimiter),
     guard,
   };
 }
 
-export { createRequireAuth, createAuthController, createAuthService, createAuthRouter };
+export {
+  createRequireAuth,
+  createAuthController,
+  createAuthService,
+  createAuthRouter,
+};

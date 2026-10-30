@@ -17,6 +17,7 @@ describe("Health check endpoint", () => {
     expect(response.headers["x-frame-options"]).toBe("DENY");
     expect(response.headers["referrer-policy"]).toBe("no-referrer");
     expect(response.headers["cross-origin-opener-policy"]).toBe("same-origin");
+    expect(response.headers["cache-control"]).toBe("no-store");
   });
 
   it("echoes valid request ids and replaces malformed ones", async () => {

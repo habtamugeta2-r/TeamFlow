@@ -19,11 +19,7 @@ declare module "express-serve-static-core" {
 
 export function requireAuthenticatedUser(request: Request): AuthenticatedUser {
   if (!request.authUser) {
-    throw new HttpException(
-      401,
-      "UNAUTHENTICATED",
-      "Authentication required.",
-    );
+    throw new HttpException(401, "UNAUTHENTICATED", "Authentication required.");
   }
   return request.authUser;
 }

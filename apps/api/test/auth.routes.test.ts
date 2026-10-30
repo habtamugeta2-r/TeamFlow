@@ -96,6 +96,21 @@ describe("auth routes", () => {
     expect(response.body.error.code).toBe("EMAIL_IN_USE");
   });
 
+  it("rejects oversized passwords before invoking authentication", async () => {
+    const authService = createAuthServiceStub();
+
+    const response = await request(createTestApp(authService))
+      .post("/api/auth/login")
+      .send({
+        email: "test@example.com",
+        password: "p".repeat(1025),
+      });
+
+    expect(response.status).toBe(400);
+    expect(response.body.error.code).toBe("VALIDATION_ERROR");
+    expect(authService.authenticateUser).not.toHaveBeenCalled();
+  });
+
   it("sets the session cookie on login without returning the token", async () => {
     const response = await request(createTestApp(createAuthServiceStub()))
       .post("/api/auth/login")

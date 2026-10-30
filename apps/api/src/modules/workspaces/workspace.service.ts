@@ -354,13 +354,19 @@ export class WorkspaceService {
 
     if (newRole === "OWNER") {
       return this.database.$transaction(async (transaction) => {
-        await transaction.workspaceMembership.update({
-          where: { id: actorMembership.id },
-          data: { role: "ADMIN" },
-        });
+        const ownershipClaim = await transaction.workspaceMembership.updateMany(
+          {
+            where: { id: actorMembership.id, role: "OWNER" },
+            data: { role: "ADMIN" },
+          },
+        );
+
+        if (ownershipClaim.count !== 1) {
+          throw new WorkspaceServiceError("FORBIDDEN_ROLE_CHANGE");
+        }
 
         const updatedTarget = await transaction.workspaceMembership.update({
-          where: { id: membershipId },
+          where: { id: membershipId, workspaceId },
           data: { role: "OWNER" },
           select: membershipDetailSelect,
         });

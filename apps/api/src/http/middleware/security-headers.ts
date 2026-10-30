@@ -9,6 +9,7 @@ const STATIC_HEADERS: Record<string, string> = {
   "X-Frame-Options": "DENY",
   "Referrer-Policy": "no-referrer",
   "Cross-Origin-Opener-Policy": "same-origin",
+  "Cache-Control": "no-store",
 };
 
 export function createSecurityHeaders(

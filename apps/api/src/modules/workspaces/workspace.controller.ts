@@ -1,4 +1,4 @@
-import type { RequestHandler } from "express";
+import type { Request, RequestHandler } from "express";
 import { sendSuccess } from "../../http/response.js";
 import { parseRequest } from "../../http/validation.js";
 import { runWithErrorMap } from "../../http/service-error.js";
@@ -14,9 +14,24 @@ import {
 } from "./workspace.schemas.js";
 import type { WorkspaceService } from "./workspace.service.js";
 
+function parseWorkspaceId(request: Request): string {
+  return parseRequest(
+    workspaceIdSchema,
+    request.params.workspaceId,
+    "Invalid workspace ID.",
+  );
+}
+
+function parseMembershipId(request: Request): string {
+  return parseRequest(
+    membershipIdSchema,
+    request.params.membershipId,
+    "Invalid membership ID.",
+  );
+}
+
 export class WorkspaceController {
-  constructor(private readonly service: WorkspaceService) {
-  }
+  constructor(private readonly service: WorkspaceService) {}
 
   /** POST / */
   create: RequestHandler = async (request, response) => {
@@ -44,11 +59,7 @@ export class WorkspaceController {
   /** GET /:workspaceId */
   get: RequestHandler = async (request, response) => {
     const user = requireAuthenticatedUser(request);
-    const workspaceId = parseRequest(
-      workspaceIdSchema,
-      request.params.workspaceId,
-      "Invalid workspace ID.",
-    );
+    const workspaceId = parseWorkspaceId(request);
     const data = await runWithErrorMap(workspaceErrors, () =>
       this.service.getUserWorkspace(workspaceId, user.id),
     );
@@ -58,11 +69,7 @@ export class WorkspaceController {
   /** PATCH /:workspaceId */
   update: RequestHandler = async (request, response) => {
     const user = requireAuthenticatedUser(request);
-    const workspaceId = parseRequest(
-      workspaceIdSchema,
-      request.params.workspaceId,
-      "Invalid workspace ID.",
-    );
+    const workspaceId = parseWorkspaceId(request);
     const input = parseRequest(
       updateWorkspaceSchema,
       request.body,
@@ -77,11 +84,7 @@ export class WorkspaceController {
   /** DELETE /:workspaceId */
   delete: RequestHandler = async (request, response) => {
     const user = requireAuthenticatedUser(request);
-    const workspaceId = parseRequest(
-      workspaceIdSchema,
-      request.params.workspaceId,
-      "Invalid workspace ID.",
-    );
+    const workspaceId = parseWorkspaceId(request);
     await runWithErrorMap(workspaceErrors, () =>
       this.service.deleteWorkspace(workspaceId, user.id),
     );
@@ -91,11 +94,7 @@ export class WorkspaceController {
   /** GET /:workspaceId/members */
   listMembers: RequestHandler = async (request, response) => {
     const user = requireAuthenticatedUser(request);
-    const workspaceId = parseRequest(
-      workspaceIdSchema,
-      request.params.workspaceId,
-      "Invalid workspace ID.",
-    );
+    const workspaceId = parseWorkspaceId(request);
     const data = await runWithErrorMap(workspaceErrors, () =>
       this.service.listWorkspaceMembers(workspaceId, user.id),
     );
@@ -105,11 +104,7 @@ export class WorkspaceController {
   /** POST /:workspaceId/members */
   addMember: RequestHandler = async (request, response) => {
     const user = requireAuthenticatedUser(request);
-    const workspaceId = parseRequest(
-      workspaceIdSchema,
-      request.params.workspaceId,
-      "Invalid workspace ID.",
-    );
+    const workspaceId = parseWorkspaceId(request);
     const input = parseRequest(
       addMemberSchema,
       request.body,
@@ -124,16 +119,8 @@ export class WorkspaceController {
   /** PATCH /:workspaceId/members/:membershipId */
   updateMemberRole: RequestHandler = async (request, response) => {
     const user = requireAuthenticatedUser(request);
-    const workspaceId = parseRequest(
-      workspaceIdSchema,
-      request.params.workspaceId,
-      "Invalid workspace ID.",
-    );
-    const membershipId = parseRequest(
-      membershipIdSchema,
-      request.params.membershipId,
-      "Invalid membership ID.",
-    );
+    const workspaceId = parseWorkspaceId(request);
+    const membershipId = parseMembershipId(request);
     const input = parseRequest(
       updateMemberRoleSchema,
       request.body,
@@ -153,16 +140,8 @@ export class WorkspaceController {
   /** DELETE /:workspaceId/members/:membershipId */
   removeMember: RequestHandler = async (request, response) => {
     const user = requireAuthenticatedUser(request);
-    const workspaceId = parseRequest(
-      workspaceIdSchema,
-      request.params.workspaceId,
-      "Invalid workspace ID.",
-    );
-    const membershipId = parseRequest(
-      membershipIdSchema,
-      request.params.membershipId,
-      "Invalid membership ID.",
-    );
+    const workspaceId = parseWorkspaceId(request);
+    const membershipId = parseMembershipId(request);
     await runWithErrorMap(workspaceErrors, () =>
       this.service.removeWorkspaceMember(workspaceId, user.id, membershipId),
     );

@@ -94,6 +94,8 @@ export class ProjectController {
   };
 }
 
-export function createProjectController(service: ProjectService): ProjectController {
+export function createProjectController(
+  service: ProjectService,
+): ProjectController {
   return new ProjectController(service);
 }

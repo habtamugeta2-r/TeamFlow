@@ -3,6 +3,7 @@ import request from "supertest";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import type { Logger } from "../src/core/logger/logger.js";
 import { createExceptionFilter } from "../src/http/middleware/exception-filter.js";
+import { runWithErrorMap, ServiceError } from "../src/http/service-error.js";
 
 afterEach(() => {
   vi.restoreAllMocks();
@@ -17,6 +18,16 @@ describe("exceptionFilter", () => {
       error: vi.fn(),
     };
   }
+
+  it("does not treat inherited error-map properties as mapped errors", async () => {
+    const error = new ServiceError("__proto__");
+
+    await expect(
+      runWithErrorMap({ NOT_FOUND: [404, "Not found."] }, async () => {
+        throw error;
+      }),
+    ).rejects.toBe(error);
+  });
 
   function createJsonApp() {
     const app = express();

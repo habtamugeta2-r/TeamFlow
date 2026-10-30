@@ -13,8 +13,7 @@ import {
 import type { AuthService } from "./auth.service.js";
 
 export class AuthController {
-  constructor(private readonly authService: AuthService) {
-  }
+  constructor(private readonly authService: AuthService) {}
 
   /** POST /register */
   register: RequestHandler = async (request, response) => {

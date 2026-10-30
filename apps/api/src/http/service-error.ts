@@ -33,7 +33,7 @@ export async function runWithErrorMap<T>(
   try {
     return await operation();
   } catch (error) {
-    if (error instanceof ServiceError && error.code in errorMap) {
+    if (error instanceof ServiceError && Object.hasOwn(errorMap, error.code)) {
       const mapping = errorMap[error.code]!;
       if (mapping.length === 3) {
         const [status, code, message] = mapping;

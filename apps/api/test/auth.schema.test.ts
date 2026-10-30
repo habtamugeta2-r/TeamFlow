@@ -31,6 +31,16 @@ describe("registerSchema", () => {
       expect(result.error.issues).toHaveLength(3);
     }
   });
+
+  it("rejects passwords longer than the supported maximum", () => {
+    const result = registerSchema.safeParse({
+      name: "Alex Doe",
+      email: "alex@example.com",
+      password: "p".repeat(1025),
+    });
+
+    expect(result.success).toBe(false);
+  });
 });
 
 describe("loginSchema", () => {
@@ -44,5 +54,14 @@ describe("loginSchema", () => {
     if (!result.success) {
       expect(result.error.issues).toHaveLength(2);
     }
+  });
+
+  it("rejects passwords longer than the supported maximum", () => {
+    const result = loginSchema.safeParse({
+      email: "alex@example.com",
+      password: "p".repeat(1025),
+    });
+
+    expect(result.success).toBe(false);
   });
 });

@@ -69,6 +69,7 @@ app.use(
 app.use(createExceptionFilter(createLogger()));
 
 const workspaceId = "00000000-0000-4000-8000-000000000001";
+const otherWorkspaceId = "00000000-0000-4000-8000-000000000002";
 const ownerId = "00000000-0000-4000-8000-000000000010";
 const adminId = "00000000-0000-4000-8000-000000000020";
 const memberId = "00000000-0000-4000-8000-000000000030";
@@ -398,18 +399,21 @@ describe("PATCH /api/workspaces/:workspaceId/members/:membershipId", () => {
         user: { id: targetUserId, name: "User", email: "user@example.com" },
       } as never);
 
+    const claimOwnership = vi.fn().mockResolvedValue({ count: 1 });
+    const transferOwnership = vi.fn().mockImplementation(({ data }) => ({
+      id: targetMembershipId,
+      workspaceId,
+      userId: targetUserId,
+      role: data.role,
+      createdAt: new Date(),
+      updatedAt: new Date(),
+      user: { id: targetUserId, name: "User", email: "user@example.com" },
+    }));
     vi.mocked(prisma.$transaction).mockImplementationOnce(async (callback) => {
       const tx = {
         workspaceMembership: {
-          update: vi.fn().mockImplementation(({ data }) => ({
-            id: targetMembershipId,
-            workspaceId,
-            userId: targetUserId,
-            role: data.role,
-            createdAt: new Date(),
-            updatedAt: new Date(),
-            user: { id: targetUserId, name: "User", email: "user@example.com" },
-          })),
+          updateMany: claimOwnership,
+          update: transferOwnership,
         },
       };
       return callback(tx as never);
@@ -423,6 +427,89 @@ describe("PATCH /api/workspaces/:workspaceId/members/:membershipId", () => {
     expect(response.status).toBe(200);
     expect(response.body.data.membership.role).toBe("OWNER");
     expect(response.body.data.previousOwnerRole).toBe("ADMIN");
+    expect(prisma.$transaction).toHaveBeenCalledOnce();
+    expect(claimOwnership).toHaveBeenCalledWith({
+      where: { id: ownerMembershipId, role: "OWNER" },
+      data: { role: "ADMIN" },
+    });
+    expect(transferOwnership).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: targetMembershipId, workspaceId },
+        data: { role: "OWNER" },
+      }),
+    );
+  });
+
+  it("does not transfer ownership to a membership in another workspace", async () => {
+    vi.mocked(prisma.workspaceMembership.findUnique)
+      .mockResolvedValueOnce({
+        id: ownerMembershipId,
+        role: "OWNER",
+        userId: ownerId,
+        workspaceId,
+      } as never)
+      .mockResolvedValueOnce({
+        id: targetMembershipId,
+        workspaceId: otherWorkspaceId,
+        userId: targetUserId,
+        role: "MEMBER",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        user: { id: targetUserId, name: "User", email: "user@example.com" },
+      } as never);
+
+    const response = await request(app)
+      .patch(`/api/workspaces/${workspaceId}/members/${targetMembershipId}`)
+      .set("x-test-user-id", ownerId)
+      .send({ role: "OWNER" });
+
+    expect(response.status).toBe(404);
+    expect(response.body.error.code).toBe("NOT_FOUND");
+    expect(prisma.$transaction).not.toHaveBeenCalled();
+  });
+
+  it("rejects a stale concurrent ownership transfer", async () => {
+    vi.mocked(prisma.workspaceMembership.findUnique)
+      .mockResolvedValueOnce({
+        id: ownerMembershipId,
+        role: "OWNER",
+        userId: ownerId,
+        workspaceId,
+      } as never)
+      .mockResolvedValueOnce({
+        id: targetMembershipId,
+        workspaceId,
+        userId: targetUserId,
+        role: "MEMBER",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+        user: { id: targetUserId, name: "User", email: "user@example.com" },
+      } as never);
+
+    const updateTarget = vi.fn();
+    const claimOwnership = vi.fn().mockResolvedValue({ count: 0 });
+    vi.mocked(prisma.$transaction).mockImplementationOnce(async (callback) => {
+      const tx = {
+        workspaceMembership: {
+          updateMany: claimOwnership,
+          update: updateTarget,
+        },
+      };
+      return callback(tx as never);
+    });
+
+    const response = await request(app)
+      .patch(`/api/workspaces/${workspaceId}/members/${targetMembershipId}`)
+      .set("x-test-user-id", ownerId)
+      .send({ role: "OWNER" });
+
+    expect(response.status).toBe(403);
+    expect(response.body.error.code).toBe("FORBIDDEN");
+    expect(claimOwnership).toHaveBeenCalledWith({
+      where: { id: ownerMembershipId, role: "OWNER" },
+      data: { role: "ADMIN" },
+    });
+    expect(updateTarget).not.toHaveBeenCalled();
   });
 
   it("prevents directly demoting the owner without transfer", async () => {
