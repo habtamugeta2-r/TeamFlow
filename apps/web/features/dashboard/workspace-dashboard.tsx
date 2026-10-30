@@ -2,8 +2,10 @@
 
 import { Layers3, LoaderCircle } from "lucide-react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import DashboardShell from "@/features/dashboard/components/dashboard-shell";
+import WorkspaceDirectory from "@/features/dashboard/components/workspace-directory";
 import WorkspaceOverview from "@/features/dashboard/components/workspace-overview";
 import { useActivityData } from "@/features/dashboard/hooks/use-activity-data";
 import { useActionRunner } from "@/features/dashboard/hooks/use-action-runner";
@@ -19,8 +21,14 @@ import WorkspaceDialog from "@/features/dashboard/components/workspace-dialog";
 import ProjectDialog from "@/features/dashboard/components/project-dialog";
 import TaskDialog from "@/features/dashboard/components/task-dialog";
 
-export default function WorkspaceDashboard() {
-  const session = useDashboardSession();
+export default function WorkspaceDashboard({
+  workspaceId,
+}: {
+  workspaceId?: string;
+}) {
+  const router = useRouter();
+  const isDirectory = !workspaceId;
+  const session = useDashboardSession(workspaceId);
   const {
     user,
     workspaces,
@@ -96,9 +104,9 @@ export default function WorkspaceDashboard() {
   });
   const [dialog, setDialog] = useState<WorkspaceDialogKind | null>(null);
 
-  const activeWorkspace = workspaces.find(
-    (item) => item.id === activeWorkspaceId,
-  );
+  const activeWorkspace = isDirectory
+    ? undefined
+    : workspaces.find((item) => item.id === activeWorkspaceId);
   function selectProject(projectId: string) {
     setActiveProjectId(projectId);
     setTaskPage(1);
@@ -115,7 +123,11 @@ export default function WorkspaceDashboard() {
     reloadMembers,
     setWorkspaces,
     endSession,
-    onLeave: () => setActiveWorkspaceId(""),
+    onLeave: () => {
+      setActiveWorkspaceId("");
+      router.replace("/dashboard");
+    },
+    onOpenWorkspace: (id) => router.push(`/dashboard/${id}`),
     onClearAssignee: updateTaskFilters,
     currentAssigneeFilter: taskFilters.assigneeId,
     closeDialog: () => setDialog(null),
@@ -173,81 +185,90 @@ export default function WorkspaceDashboard() {
         resetTaskFilters();
         setError("");
         setNotice("");
+        router.push(`/dashboard/${workspaceId}`);
       }}
       onSignOut={() => void workspaceActions.signOut()}
       onDismissError={() => setError("")}
     >
-      <WorkspaceOverview
-        workspace={activeWorkspace}
-        user={user}
-        members={members}
-        membersLoading={membersLoading}
-        isOwner={activeWorkspace?.membership.role === "OWNER"}
-        canManageTeam={
-          activeWorkspace?.membership.role === "OWNER" ||
-          activeWorkspace?.membership.role === "ADMIN"
-        }
-        busy={busy}
-        projects={projects}
-        activeProject={activeProject}
-        activeProjectId={activeProjectId}
-        projectsLoading={projectsLoading}
-        projectsError={projectsError}
-        tasks={tasks}
-        tasksLoading={tasksLoading}
-        tasksError={tasksError}
-        taskTotal={taskTotal}
-        taskPage={taskPage}
-        taskTotalPages={taskTotalPages}
-        taskFilters={taskFilters}
-        activity={{
-          events: activities,
-          page: activityPage,
-          totalPages: activityTotalPages,
-          loading: activityLoading,
-          loadingMore: activityLoadingMore,
-          error: activityError,
-        }}
-        onCreateWorkspace={() => setDialog("create")}
-        onRenameWorkspace={() => setDialog("rename")}
-        onDeleteWorkspace={() => setDialog("delete")}
-        onCreateProject={() => {
-          projectActions.setEditingProject(undefined);
-          projectActions.setDialogOpen(true);
-        }}
-        onEditProject={(project) => {
-          projectActions.setEditingProject(project);
-          projectActions.setDialogOpen(true);
-        }}
-        onArchiveProject={(project) =>
-          void projectActions.archiveSelectedProject(project)
-        }
-        onSelectProject={selectProject}
-        onRetryProjects={refreshProjects}
-        onCreateTask={() => {
-          taskActions.setEditingTask(undefined);
-          taskActions.setDialogOpen(true);
-        }}
-        onEditTask={(task) => {
-          taskActions.setEditingTask(task);
-          taskActions.setDialogOpen(true);
-        }}
-        onChangeTaskStatus={(task, status) =>
-          void taskActions.changeStatus(task, status)
-        }
-        onRetryTasks={refreshTasks}
-        onTaskFiltersChange={updateTaskFilters}
-        onTaskPageChange={setTaskPage}
-        onInviteMember={() => setDialog("invite")}
-        onUpdateMemberRole={(member, role) =>
-          void workspaceActions.updateRole(member, role)
-        }
-        onRemoveMember={(member) =>
-          void workspaceActions.removeWorkspaceMember(member)
-        }
-        onRetryActivity={refreshActivity}
-        onLoadMoreActivity={() => void loadMoreActivity()}
-      />
+      {isDirectory ? (
+        <WorkspaceDirectory
+          workspaces={workspaces}
+          onCreateWorkspace={() => setDialog("create")}
+          onSelectWorkspace={(id) => router.push(`/dashboard/${id}`)}
+        />
+      ) : (
+        <WorkspaceOverview
+          workspace={activeWorkspace}
+          user={user}
+          members={members}
+          membersLoading={membersLoading}
+          isOwner={activeWorkspace?.membership.role === "OWNER"}
+          canManageTeam={
+            activeWorkspace?.membership.role === "OWNER" ||
+            activeWorkspace?.membership.role === "ADMIN"
+          }
+          busy={busy}
+          projects={projects}
+          activeProject={activeProject}
+          activeProjectId={activeProjectId}
+          projectsLoading={projectsLoading}
+          projectsError={projectsError}
+          tasks={tasks}
+          tasksLoading={tasksLoading}
+          tasksError={tasksError}
+          taskTotal={taskTotal}
+          taskPage={taskPage}
+          taskTotalPages={taskTotalPages}
+          taskFilters={taskFilters}
+          activity={{
+            events: activities,
+            page: activityPage,
+            totalPages: activityTotalPages,
+            loading: activityLoading,
+            loadingMore: activityLoadingMore,
+            error: activityError,
+          }}
+          onCreateWorkspace={() => setDialog("create")}
+          onRenameWorkspace={() => setDialog("rename")}
+          onDeleteWorkspace={() => setDialog("delete")}
+          onCreateProject={() => {
+            projectActions.setEditingProject(undefined);
+            projectActions.setDialogOpen(true);
+          }}
+          onEditProject={(project) => {
+            projectActions.setEditingProject(project);
+            projectActions.setDialogOpen(true);
+          }}
+          onArchiveProject={(project) =>
+            void projectActions.archiveSelectedProject(project)
+          }
+          onSelectProject={selectProject}
+          onRetryProjects={refreshProjects}
+          onCreateTask={() => {
+            taskActions.setEditingTask(undefined);
+            taskActions.setDialogOpen(true);
+          }}
+          onEditTask={(task) => {
+            taskActions.setEditingTask(task);
+            taskActions.setDialogOpen(true);
+          }}
+          onChangeTaskStatus={(task, status) =>
+            void taskActions.changeStatus(task, status)
+          }
+          onRetryTasks={refreshTasks}
+          onTaskFiltersChange={updateTaskFilters}
+          onTaskPageChange={setTaskPage}
+          onInviteMember={() => setDialog("invite")}
+          onUpdateMemberRole={(member, role) =>
+            void workspaceActions.updateRole(member, role)
+          }
+          onRemoveMember={(member) =>
+            void workspaceActions.removeWorkspaceMember(member)
+          }
+          onRetryActivity={refreshActivity}
+          onLoadMoreActivity={() => void loadMoreActivity()}
+        />
+      )}
 
       {dialog && (
         <WorkspaceDialog

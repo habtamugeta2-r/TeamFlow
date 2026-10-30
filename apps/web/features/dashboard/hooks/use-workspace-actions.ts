@@ -34,6 +34,7 @@ export function useWorkspaceActions({
   setWorkspaces,
   endSession,
   onLeave,
+  onOpenWorkspace,
   onClearAssignee,
   currentAssigneeFilter,
   closeDialog,
@@ -47,6 +48,7 @@ export function useWorkspaceActions({
   setWorkspaces: (workspaces: Workspace[]) => void;
   endSession: () => Promise<void>;
   onLeave: () => void;
+  onOpenWorkspace: (workspaceId: string) => void;
   onClearAssignee: (filters: Partial<TaskFilterState>) => void;
   currentAssigneeFilter: string;
   closeDialog: () => void;
@@ -56,7 +58,8 @@ export function useWorkspaceActions({
       await runAction({
         action: async () => {
           const createdId = await createWorkspace(values.name!.trim());
-          await reloadWorkspaces(createdId);
+          await reloadWorkspaces(workspace ? createdId : "");
+          if (workspace) onOpenWorkspace(createdId);
         },
         successMessage: "Workspace created.",
         onSuccess: closeDialog,
@@ -90,7 +93,10 @@ export function useWorkspaceActions({
           await reloadWorkspaces();
         },
         successMessage: "Workspace deleted.",
-        onSuccess: closeDialog,
+        onSuccess: () => {
+          closeDialog();
+          onLeave();
+        },
       });
     }
   }

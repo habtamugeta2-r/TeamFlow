@@ -1,6 +1,7 @@
 "use client";
 
 import {
+  ArrowLeft,
   Check,
   ChevronDown,
   Layers3,
@@ -55,7 +56,9 @@ export default function DashboardShell({
 
         <div className="sidebar-section">
           <div className="sidebar-label-row">
-            <p className="sidebar-label">Your workspaces</p>
+            <Link className="sidebar-label-link" href="/dashboard">
+              All team spaces
+            </Link>
             <button
               className="icon-button icon-button-small"
               type="button"
@@ -122,9 +125,22 @@ export default function DashboardShell({
       <div className="main-panel">
         <header className="topbar">
           <div className="breadcrumbs">
-            <span>WORKSPACE</span>
-            <span className="breadcrumb-slash">/</span>
-            <strong>{activeWorkspace?.name ?? "Overview"}</strong>
+            {activeWorkspace ? (
+              <>
+                <Link className="breadcrumb-home" href="/dashboard">
+                  <ArrowLeft size={14} aria-hidden="true" />
+                  All team spaces
+                </Link>
+                <span className="breadcrumb-slash">/</span>
+                <strong>{activeWorkspace.name}</strong>
+              </>
+            ) : (
+              <>
+                <span>TEAMFLOW</span>
+                <span className="breadcrumb-slash">/</span>
+                <strong>All team spaces</strong>
+              </>
+            )}
           </div>
           <div className="topbar-right">
             <span className="secure-label">

@@ -1,16 +1,12 @@
 "use client";
 
-import { ArrowRight, Layers3, LoaderCircle } from "lucide-react";
+import { ArrowRight, Eye, EyeOff, Layers3, LoaderCircle } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { type FormEvent, useEffect, useState } from "react";
 import { ApiError } from "@/lib/api";
 import { errorMessage } from "@/lib/error-message";
-import {
-  getCurrentUser,
-  registerAccount,
-  signIn,
-} from "@/lib/teamflow/auth";
+import { getCurrentUser, registerAccount, signIn } from "@/lib/teamflow/auth";
 
 export default function AuthScreen() {
   const router = useRouter();
@@ -18,6 +14,7 @@ export default function AuthScreen() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
 
@@ -134,19 +131,35 @@ export default function AuthScreen() {
                 required
               />
             </label>
-            <label className="field-label">
-              Password
-              <input
-                type="password"
-                autoComplete={
-                  mode === "login" ? "current-password" : "new-password"
-                }
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                minLength={8}
-                required
-              />
-            </label>
+            <div className="field-label password-field">
+              <label htmlFor="auth-password">Password</label>
+              <div className="password-input-wrap">
+                <input
+                  id="auth-password"
+                  type={showPassword ? "text" : "password"}
+                  autoComplete={
+                    mode === "login" ? "current-password" : "new-password"
+                  }
+                  value={password}
+                  onChange={(event) => setPassword(event.target.value)}
+                  minLength={8}
+                  required
+                />
+                <button
+                  className="password-toggle"
+                  type="button"
+                  aria-label={showPassword ? "Hide password" : "Show password"}
+                  aria-pressed={showPassword}
+                  onClick={() => setShowPassword((visible) => !visible)}
+                >
+                  {showPassword ? (
+                    <EyeOff size={17} aria-hidden="true" />
+                  ) : (
+                    <Eye size={17} aria-hidden="true" />
+                  )}
+                </button>
+              </div>
+            </div>
             {error && (
               <p className="form-error" role="alert">
                 {error}

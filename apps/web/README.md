@@ -7,8 +7,10 @@ development instructions in the repository [README](../../README.md).
 
 - `app/` contains App Router entry points and route-level loading UI.
   - `(auth)/page.tsx` serves the sign-in and registration page at `/`.
-  - `(workspace)/dashboard/page.tsx` serves the authenticated dashboard at
+  - `(workspace)/dashboard/page.tsx` serves the shared workspace directory at
     `/dashboard`.
+  - `(workspace)/dashboard/[workspaceId]/page.tsx` serves a team's projects,
+    tasks, members, and activity at `/dashboard/[workspaceId]`.
 - `features/auth/` contains authentication screens and flows.
 - `features/dashboard/` contains the dashboard composition, data/action hooks,
   typed form contracts, and focused UI components for each dashboard concern.

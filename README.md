@@ -110,17 +110,19 @@ workspace operations require a reachable, migrated PostgreSQL database.
 
 ## Quality checks
 
-Run these commands from the repository root:
+GitHub Actions runs linting, type-checking, API tests, and production builds on
+pushes to `main` or `feature/**` branches and on pull requests targeting
+`main`. Run the same checks locally from the repository root:
 
 ```bash
 npm run lint
-npm run format:check
 npm run typecheck
 npm test
 npm run build
 ```
 
-Use `npm run format` to apply the configured Prettier formatting.
+Run `npm run format:check` to check formatting, or `npm run format` to apply
+the configured Prettier formatting.
 
 ## Project documentation
 

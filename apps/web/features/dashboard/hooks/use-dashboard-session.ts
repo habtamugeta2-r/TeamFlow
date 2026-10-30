@@ -8,7 +8,7 @@ import { getCurrentUser, signOut } from "@/lib/teamflow/auth";
 import { listWorkspaces } from "@/lib/teamflow/workspaces";
 import type { TeamUser, Workspace } from "@/lib/teamflow/types";
 
-export function useDashboardSession() {
+export function useDashboardSession(workspaceId?: string) {
   const router = useRouter();
   const [user, setUser] = useState<TeamUser | null>(null);
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
@@ -20,13 +20,21 @@ export function useDashboardSession() {
     let cancelled = false;
 
     async function initialize() {
+      setLoading(true);
+      setError("");
       try {
         const currentUser = await getCurrentUser();
         const nextWorkspaces = await listWorkspaces();
         if (cancelled) return;
+        const selectedWorkspace = workspaceId
+          ? nextWorkspaces.find((item) => item.id === workspaceId)
+          : undefined;
         setUser(currentUser);
         setWorkspaces(nextWorkspaces);
-        setActiveWorkspaceId(nextWorkspaces[0]?.id ?? "");
+        setActiveWorkspaceId(selectedWorkspace?.id ?? "");
+        if (workspaceId && !selectedWorkspace) {
+          router.replace("/dashboard");
+        }
       } catch (reason) {
         if (!cancelled) {
           if (reason instanceof ApiError && reason.status === 401) {
@@ -44,13 +52,16 @@ export function useDashboardSession() {
     return () => {
       cancelled = true;
     };
-  }, [router]);
+  }, [router, workspaceId]);
 
   async function reloadWorkspaces(preferredId = activeWorkspaceId) {
     const nextWorkspaces = await listWorkspaces();
-    const nextActiveId = nextWorkspaces.some((item) => item.id === preferredId)
-      ? preferredId
-      : (nextWorkspaces[0]?.id ?? "");
+    const nextActiveId =
+      preferredId === ""
+        ? ""
+        : nextWorkspaces.some((item) => item.id === preferredId)
+          ? preferredId
+          : (nextWorkspaces[0]?.id ?? "");
     setWorkspaces(nextWorkspaces);
     setActiveWorkspaceId(nextActiveId);
     return nextActiveId;
